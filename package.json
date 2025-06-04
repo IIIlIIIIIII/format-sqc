@@ -1,0 +1,70 @@
+{
+  "name": "format-sqc",
+  "displayName": "format-sqc",
+  "description": "format sqc support C and SQL",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.100.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onLanguage:sqc"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "format-sqc.formatsqc",
+        "title": "Format SQC"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "format-sqc.formatsqc",
+        "key": "shift+alt+f",
+        "when": "editorLangId == sqc"
+      }
+    ],
+    "languages": [
+      {
+        "id": "sqc",
+        "extensions": [
+          ".sqc"
+        ],
+        "aliases": [
+          "SQC",
+          "sqc"
+        ]
+      }
+    ],
+    "formats": [
+      {
+        "language": "sqc",
+        "providerId": "sqc-formatter"
+      }
+    ]
+  },
+  "scripts": {
+    "watch": "tsc --watch --preserveWatchOutput",
+    "compile": "tsc -p ./ && webpack --mode development"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.10",
+    "@types/node": "20.x",
+    "@types/vscode": "^1.100.0",
+    "@typescript-eslint/eslint-plugin": "^8.31.1",
+    "@typescript-eslint/parser": "^8.31.1",
+    "@vscode/test-cli": "^0.0.10",
+    "@vscode/test-electron": "^2.5.2",
+    "eslint": "^9.25.1",
+    "ts-loader": "^9.5.2",
+    "typescript": "^5.8.3",
+    "webpack": "^5.99.9",
+    "webpack-cli": "^6.0.1"
+  },
+  "dependencies": {
+    "winston": "^3.17.0"
+  }
+}

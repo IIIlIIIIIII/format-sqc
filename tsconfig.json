@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "sourceMap": true,  // ✅ 必须启用
+    "inlineSources": true, // 可选：嵌入源码到 Source Map
+    "outDir": "out",    // 输出目录需与 launch.json 匹配
+    "noEmitOnError": false,
+    "module": "commonjs",
+    "target": "es6",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true
+  }
+}
