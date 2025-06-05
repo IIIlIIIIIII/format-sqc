@@ -2,6 +2,10 @@
   "name": "format-sqc",
   "displayName": "format-sqc",
   "description": "format sqc support C and SQL",
+  "author": "白色黄昏",
+  "publisher": "baisehuanghun",
+  "icon": "./icon.png",
+  "repository": "private",
   "version": "0.0.1",
   "engines": {
     "vscode": "^1.100.0"
