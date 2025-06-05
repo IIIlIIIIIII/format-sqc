@@ -1,77 +1,89 @@
 {
-  "name": "format-sqc",
-  "displayName": "format-sqc",
-  "description": "format sqc support C and SQL",
-  "author": "白色黄昏",
-  "publisher": "baisehuanghun",
-  "icon": "./icon.png",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/IIIlIIIIIII/format-sqc.git"
-  },
-  "version": "0.0.5",
-  "engines": {
-    "vscode": "^1.100.0"
-  },
-  "categories": [
-    "Formatters"
-  ],
-  "activationEvents": [
-    "onLanguage:sqc"
-  ],
-  "main": "./dist/extension.js",
-  "contributes": {
-    "commands": [
-      {
-        "command": "format-sqc.formatsqc",
-        "title": "Format SQC"
-      }
+    "name": "format-sqc",
+    "displayName": "Db2 embedded SQL formatter for C/C++",
+    "description": "Syntax formatter for embedded IBM Db2 SQL statements in C/C++ code",
+    "author": "白色黄昏",
+    "publisher": "baisehuanghun",
+    "icon": "./icon.png",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/IIIlIIIIIII/format-sqc.git"
+    },
+    "version": "0.0.7",
+    "engines": {
+        "vscode": "^1.100.0"
+    },
+    "categories": [
+        "Formatters"
     ],
-    "keybindings": [
-      {
-        "command": "format-sqc.formatsqc",
-        "key": "ctrl+alt+X",
-        "when": "editorLangId == sqc"
-      }
+    "activationEvents": [
+        "onLanguage:sqc",
+        "onLanguage:sqx"
     ],
-    "languages": [
-      {
-        "id": "sqc",
-        "extensions": [
-          ".sqc"
+    "main": "./dist/extension.js",
+    "contributes": {
+        "commands": [
+            {
+                "command": "format-sqc.formatsqc",
+                "title": "格式化DB2 SQL"
+            }
         ],
-        "aliases": [
-          "SQC",
-          "sqc"
+        "menus": {
+            "editor/context": [
+                {
+                    "command": "format-sqc.formatsqc",
+                    "group": "format"
+                }
+            ]
+        },
+        "keybindings": [
+            {
+                "command": "format-sqc.formatsqc",
+                "key": "ctrl+shift+X"
+            }
+        ],
+        "languages": [
+            {
+                "id": "c",
+                "extensions": [
+                    ".sqc"
+                ],
+                "aliases": [
+                    "SQC",
+                    "sqc"
+                ]
+            },
+            {
+                "id": "cpp",
+                "extensions": [
+                    ".sqx"
+                ],
+                "aliases": [
+                    "SQX",
+                    "sqx"
+                ]
+            }
         ]
-      }
-    ],
-    "formats": [
-      {
-        "language": "sqc",
-        "providerId": "sqc-formatter"
-      }
-    ]
-  },
-  "scripts": {
-    "watch": "tsc --watch --preserveWatchOutput",
-    "compile": "tsc -p ./ && webpack --mode development"
-  },
-  "devDependencies": {
-    "@types/mocha": "^10.0.10",
-    "@types/node": "20.x",
-    "@types/vscode": "^1.100.0",
-    "@typescript-eslint/eslint-plugin": "^8.31.1",
-    "@typescript-eslint/parser": "^8.31.1",
-    "@vscode/test-cli": "^0.0.10",
-    "@vscode/test-electron": "^2.5.2",
-    "eslint": "^9.25.1",
-    "ts-loader": "^9.5.2",
-    "typescript": "^5.8.3",
-    "webpack": "^5.99.9",
-    "webpack-cli": "^6.0.1"
-  },
-  "dependencies": {
-    "winston": "^3.17.0"
-  }
+    },
+    "scripts": {
+        "watch": "tsc --watch --preserveWatchOutput",
+        "compile": "tsc -p ./ && webpack --mode development"
+    },
+    "devDependencies": {
+        "@types/mocha": "^10.0.10",
+        "@types/node": "20.x",
+        "@types/vscode": "^1.100.0",
+        "@typescript-eslint/eslint-plugin": "^8.31.1",
+        "@typescript-eslint/parser": "^8.31.1",
+        "@vscode/test-cli": "^0.0.10",
+        "@vscode/test-electron": "^2.5.2",
+        "eslint": "^9.25.1",
+        "ts-loader": "^9.5.2",
+        "typescript": "^5.8.3",
+        "webpack": "^5.99.9",
+        "webpack-cli": "^6.0.1"
+    },
+    "dependencies": {
+        "winston": "^3.17.0"
+    }
 }

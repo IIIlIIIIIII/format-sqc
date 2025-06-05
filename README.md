@@ -1,7 +1,5 @@
 使用说明
-ctrl+shift+P搜索Format SQC即可
-或者使用快捷键ctrl+alt+X
+在SQC文件中,在SQL区域右键,点击格式化DB2 SQL
+或者框选SQL区域后右键点击格式化DB2 SQL
 
-注意:
-插件会先调用内置的formatDocument后再单独对SQL格式化
-格式化SQL的时候会去掉注释
+注意:如果选中区域包含非SQL的代码是不行的
