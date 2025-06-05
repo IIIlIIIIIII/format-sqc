@@ -5,7 +5,7 @@
   "author": "白色黄昏",
   "publisher": "baisehuanghun",
   "icon": "./icon.png",
-  "repository": "private",
+  "repository": "https://github.com/IIIlIIIIIII/format-sqc.git",
   "version": "0.0.1",
   "engines": {
     "vscode": "^1.100.0"
