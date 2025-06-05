@@ -18,11 +18,22 @@ export function activate(context: vscode.ExtensionContext) {
         if (!editor) { return; }
 
         try {
-            // 第一步：执行内置格式化命令
+            // 第1步：数据清洗
+            let formattedText = dataClean(editor.document.getText());
+            await editor.edit(editBuilder => {
+                editBuilder.replace(
+                    new vscode.Range(
+                        new vscode.Position(0, 0),
+                        editor.document.positionAt(editor.document.getText().length)
+                    ),
+                    formattedText
+                );
+            });
+            // 第2步：执行内置格式化命令
             await vscode.commands.executeCommand('editor.action.formatDocument');
 
-            // 第二步：执行自定义SQC格式化
-            const formattedText = formatSQCCode(editor.document.getText());
+            // 第3步：执行自定义SQC格式化
+            formattedText = formatSQCCode(editor.document.getText());
             await editor.edit(editBuilder => {
                 editBuilder.replace(
                     new vscode.Range(
@@ -49,12 +60,58 @@ function fullDocumentRange(document: vscode.TextDocument): vscode.Range {
         lastLine, document.lineAt(lastLine).text.length
     );
 }
+function dataClean(text: string): string { // 全文数据清洗
+    const lines = text.split('\n');
+    let formattedLines: string[] = []; // 返回数据
+    let inSQLBlock = false;
+
+    for (let i = 0; i < lines.length; i++) {
+        let line = lines[i];
+        let tmpline = line.replace(/\s+/g, ' '); // 合并多个空格
+        tmpline = tmpline.replace(/\t/g, '    ').trim();
+        // 处理 SQL 块开始/结束
+        if ((tmpline.startsWith("EXEC SQL") && tmpline.length === 8) ||
+            tmpline.startsWith("EXEC SQL DECLARE") ||
+            tmpline.startsWith("EXEC SQL SELECT") ||
+            tmpline.startsWith("EXEC SQL FETCH")) {
+            if (!tmpline.includes(';')) {
+                inSQLBlock = true;
+                formattedLines.push(line.split('--')[0].trimEnd());
+            } else if (tmpline.length === 1) {
+                formattedLines.push('\n' + line);
+            } else {
+                formattedLines.push(line.split('--')[0].trimEnd());
+                continue;
+            }
+            continue;
+        } else if (inSQLBlock && tmpline.includes(';')) {
+            inSQLBlock = false;
+            formattedLines.push(line.split('--')[0].trimEnd());
+            continue;
+        }
+        // SQL 块格式化（核心改进）
+        if (inSQLBlock && tmpline.includes('--')) {
+            // 如果包含 -- 注释，截取 -- 前的部分
+            formattedLines.push(line.split('--')[0].trimEnd());
+            continue;
+        }
+        else if (inSQLBlock && tmpline.includes(';')) { // 防止重复
+            continue;
+        } else if (inSQLBlock) {
+            formattedLines.push(line);
+            continue;
+        } else {
+            formattedLines.push(line);
+        }
+    }
+    return formattedLines.join('\n');
+}
+
+
 function formatSQCCode(text: string): string { // 只格式化SQL部分
     const lines = text.split('\n');
     let formattedLines: string[] = []; // 返回数据
-    let indentLevel = 0;
     let inSQLBlock = false;
-    const sqlIndent = indentLevel + 1;  // SQL 块固定缩进级别
     let SQLstr = '';
     let leadingSpaces = 0;
 
@@ -67,10 +124,11 @@ function formatSQCCode(text: string): string { // 只格式化SQL部分
             tmpline.startsWith("EXEC SQL DECLARE") ||
             tmpline.startsWith("EXEC SQL SELECT") ||
             tmpline.startsWith("EXEC SQL FETCH")) {
-            leadingSpaces = Math.ceil(countLeadingSpaces(line) / 4) * 4;
+            leadingSpaces = Math.ceil(countIndentation(line) / 4) * 4;
             if (!tmpline.includes(';')) {
-                // formattedLines.push(line);
                 inSQLBlock = true;
+            } else if (tmpline.length === 1) {
+                formattedLines.push('\n' + line);
             } else {
                 let formattedSQL = '';
                 if (tmpline.startsWith("EXEC SQL DECLARE")) {
@@ -115,15 +173,16 @@ function formatSQCCode(text: string): string { // 只格式化SQL部分
     return formattedLines.join('\n');
 }
 
-function countLeadingSpaces(line: string): number {
+function countIndentation(line: string): number {
     let count = 0;
-    for (const char of line) {
-        if (char === ' ') {
-            count++;
-        }
-        else {
+    for (const ch of line) {
+        if (ch === ' ') {
+            count += 1;
+        } else if (ch === '\t') {
+            count += 4; // 每个 tab 视为 4 个空格
+        } else {
             break;
-        } // 遇到非空格字符时停止
+        }
     }
     return count;
 }
@@ -150,6 +209,7 @@ function formatSQLString(sql: string, baseIndent: number = 0, indentSize: number
             .replace(/\s*=\s*/g, ' = ')  // 规范等号前后空格（保留各一个）
             .replace(/([^ ])([()])/g, '$1 $2')  // 左括号前加空格（如果前面不是空格）
             .replace(/([()])([^ ])/g, '$1 $2')  // 右括号后加空格（如果后面不是空格）
+            .replace(/\s*,\s*/g, ' , ')  // 规范逗号前后空格（前后各一个）
             .replace(/\s+/g, ' ')   // 合并多个空格
             .trim();
 
@@ -186,6 +246,8 @@ function formatSQLString(sql: string, baseIndent: number = 0, indentSize: number
             { pattern: 'VALUES', indentLvl: 1, lineBefore: true, lineAfter: true },
             { pattern: 'GROUP BY', indentLvl: 1, lineBefore: true, lineAfter: false },
             { pattern: 'ORDER BY', indentLvl: 1, lineBefore: true, lineAfter: false },
+            { pattern: 'FOR', indentLvl: 1, lineBefore: true, lineAfter: false },
+            { pattern: 'WITH', indentLvl: 1, lineBefore: true, lineAfter: false },
             { pattern: 'AND', indentLvl: 1, lineBefore: true, lineAfter: false },
             { pattern: 'OR', indentLvl: 1, lineBefore: true, lineAfter: false },
             { pattern: 'FETCH FIRST', indentLvl: 1, lineBefore: true, lineAfter: false }
@@ -244,10 +306,8 @@ function formatSQLString(sql: string, baseIndent: number = 0, indentSize: number
                 }
                 // 默认情况：使用当前行的缩进
                 else {
-                    const lines = result.split('\n');
-                    const currentLine = lines[lines.length - 1] || '';
-                    const commaIndent = currentLine.match(/^\s*/)?.[0].length || 0;
-                    result += '\n' + ' '.repeat(commaIndent);
+                    result += '\n';
+                    pendingNewline = true;
                 }
 
                 i++;
@@ -296,8 +356,8 @@ function formatSQLString(sql: string, baseIndent: number = 0, indentSize: number
             i++;
         }
 
-        // 4. 处理逗号换行（保持原有缩进级别）
-        result = result.replace(/,(\s*\S)/g, (match, p1) => `,\n${' '.repeat(currentIndent)}${p1.trim()}`);
+        // // 4. 处理逗号换行（保持原有缩进级别）
+        // result = result.replace(/,(\s*\S)/g, (match, p1) => `,\n${' '.repeat(currentIndent)}${p1.trim()}`);
     } catch (error) {
         vscode.window.showErrorMessage(`formatSQLString: ${error}`);
     }
