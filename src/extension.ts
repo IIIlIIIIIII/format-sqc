@@ -68,7 +68,20 @@ function formatSQCCode(text: string): string { // 只格式化SQL部分
             tmpline.startsWith("EXEC SQL SELECT") ||
             tmpline.startsWith("EXEC SQL FETCH")) {
             leadingSpaces = Math.ceil(countLeadingSpaces(line) / 4) * 4;
-            inSQLBlock = true;
+            if (!tmpline.includes(';')) {
+                // formattedLines.push(line);
+                inSQLBlock = true;
+            } else {
+                let formattedSQL = '';
+                if (tmpline.startsWith("EXEC SQL DECLARE")) {
+                    SQLstr += line + ' ';
+                }
+                formattedSQL = formatSQLString(SQLstr, leadingSpaces);
+                formattedLines.push(formattedSQL);
+                SQLstr = '';
+                leadingSpaces = 0;
+                continue;
+            }
             SQLstr += line + ' ';
             continue;
         } else if (inSQLBlock && tmpline.includes(';')) {
@@ -119,176 +132,175 @@ function countLeadingSpaces(line: string): number {
  * 1. 去掉冒号后的空格（`: name` → `:name`）。
  * 2. 合并连续多个空格为单个空格。
  * 3. 自动处理换行和缩进（基于 SQL 关键字）。
- */
-/**
- * 格式化 SQL 字符串：
- * 1. 去掉冒号后的空格（`: name` → `:name`）。
- * 2. 合并连续多个空格为单个空格。
- * 3. 自动处理换行和缩进（基于 SQL 关键字）。
  * 4. 支持基础缩进对齐（通过 `baseIndent` 参数）。
  */
 function formatSQLString(sql: string, baseIndent: number = 0, indentSize: number = 4): string {
     // 0. 保护注释内容
+    let result = '';
     const commentBlocks: string[] = [];
     let formatted = sql.replace(/(--.*?$)/gm, (match) => {
         // 将注释替换为占位符
         commentBlocks.push(match);
         return ``;
     });
-    // 1. 基础清理
-    formatted = sql
-        .replace(/:\s+/g, ':')  // 移除冒号后的空格
-        .replace(/\s*=\s*/g, ' = ')  // 规范等号前后空格（保留各一个）
-        .replace(/([^ ])([()])/g, '$1 $2')  // 左括号前加空格（如果前面不是空格）
-        .replace(/([()])([^ ])/g, '$1 $2')  // 右括号后加空格（如果后面不是空格）
-        .replace(/\s+/g, ' ')   // 合并多个空格
-        .trim();
+    try {
+        // 1. 基础清理
+        formatted = sql
+            .replace(/:\s+/g, ':')  // 移除冒号后的空格
+            .replace(/\s*=\s*/g, ' = ')  // 规范等号前后空格（保留各一个）
+            .replace(/([^ ])([()])/g, '$1 $2')  // 左括号前加空格（如果前面不是空格）
+            .replace(/([()])([^ ])/g, '$1 $2')  // 右括号后加空格（如果后面不是空格）
+            .replace(/\s+/g, ' ')   // 合并多个空格
+            .trim();
 
-    // 2. 处理INSERT语句的特殊情况
-    if (formatted.startsWith('EXEC SQL INSERT INTO')) {
-        return formatInsertStatement(formatted, baseIndent, indentSize);
-    }
-    if (formatted.startsWith('EXEC SQL DECLARE')) {
-        return formatCursorStatement(formatted, baseIndent, indentSize);
-    }
-
-    // 3. 定义关键字规则（新增lineAfter属性控制是否另起一行）
-    interface KeywordRule {
-        pattern: string;
-        indentLvl: number;  // 关键字本身的缩进级别
-        lineAfter: boolean;  // 关键字后是否另起一行
-        lineBefore: boolean; // 关键字前是否另起一行
-    }
-
-    const keywordRules: KeywordRule[] = [
-        { pattern: 'EXEC SQL', indentLvl: 0, lineBefore: true, lineAfter: true },
-        // 以下关键字后必须另起一行并增加一级缩进
-        { pattern: 'SELECT', indentLvl: 1, lineBefore: true, lineAfter: true },
-        { pattern: 'DISTINCT', indentLvl: 1, lineBefore: true, lineAfter: false },
-        { pattern: 'INSERT INTO', indentLvl: 1, lineBefore: true, lineAfter: true },
-        { pattern: 'INTO', indentLvl: 1, lineBefore: true, lineAfter: true },
-        { pattern: 'FROM', indentLvl: 1, lineBefore: true, lineAfter: true },
-        { pattern: 'WHERE', indentLvl: 1, lineBefore: true, lineAfter: true },
-        { pattern: 'SET', indentLvl: 1, lineBefore: true, lineAfter: true },
-        { pattern: 'UPDATE', indentLvl: 1, lineBefore: true, lineAfter: true },
-        // 其他关键字
-        { pattern: 'VALUES', indentLvl: 1, lineBefore: true, lineAfter: true },
-        { pattern: 'GROUP BY', indentLvl: 1, lineBefore: true, lineAfter: false },
-        { pattern: 'ORDER BY', indentLvl: 1, lineBefore: true, lineAfter: false },
-        { pattern: 'AND', indentLvl: 2, lineBefore: true, lineAfter: false },
-        { pattern: 'OR', indentLvl: 2, lineBefore: true, lineAfter: false },
-        { pattern: 'FETCH FIRST', indentLvl: 1, lineBefore: true, lineAfter: false }
-    ].sort((a, b) => b.pattern.length - a.pattern.length); // 长关键字优先匹配
-
-    // 4. 处理逻辑
-    let result = '';
-    let tokens = formatted.split(' ');
-    let i = 0;
-    let currentIndent = 0;
-    let pendingNewline = false;
-    let inParentheses = false; // 标记是否在括号内
-    let parenthesesIndent = 0; // 括号内的基准缩进
-
-    while (i < tokens.length) {
-        // 尝试匹配多词关键字
-        let matchedRule = null;
-        for (const rule of keywordRules) {
-            const keywordParts = rule.pattern.split(' ');
-            const potentialMatch = tokens.slice(i, i + keywordParts.length).join(' ');
-
-            if (potentialMatch === rule.pattern) {
-                matchedRule = rule;
-                i += keywordParts.length - 1; // 跳过已匹配的部分
-                break;
-            }
+        // 2. 处理INSERT语句的特殊情况
+        if (formatted.startsWith('EXEC SQL INSERT INTO')) {
+            return formatInsertStatement(formatted, baseIndent, indentSize);
         }
-
-        let currentToken = tokens[i];
-        // 处理左括号
-        if (currentToken === '(') {
-            inParentheses = true;
-            // 记录括号开始的位置缩进
-            const lines = result.split('\n');
-            const currentLine = lines[lines.length - 1] || '';
-            parenthesesIndent = currentLine.match(/^\s*/)?.[0].length || 0;
-            parenthesesIndent += indentSize; // 括号内容比括号多一级缩进
+        if (formatted.startsWith('EXEC SQL DECLARE')) {
+            return formatCursorStatement(formatted, baseIndent, indentSize);
         }
-
-        // 处理右括号
-        if (currentToken === ')') {
-            inParentheses = false;
-            parenthesesIndent = 0;
+    } catch (error) {
+        vscode.window.showErrorMessage(`formatSQLString: ${error}`);
+    }
+    try {
+        // 3. 定义关键字规则（新增lineAfter属性控制是否另起一行）
+        interface KeywordRule {
+            pattern: string;
+            indentLvl: number;  // 关键字本身的缩进级别
+            lineAfter: boolean;  // 关键字后是否另起一行
+            lineBefore: boolean; // 关键字前是否另起一行
         }
+        const keywordRules: KeywordRule[] = [
+            { pattern: 'EXEC SQL', indentLvl: 0, lineBefore: true, lineAfter: true },
+            // 以下关键字后必须另起一行并增加一级缩进
+            { pattern: 'SELECT', indentLvl: 1, lineBefore: true, lineAfter: true },
+            { pattern: 'DISTINCT', indentLvl: 1, lineBefore: true, lineAfter: false },
+            { pattern: 'INSERT INTO', indentLvl: 1, lineBefore: true, lineAfter: true },
+            { pattern: 'INTO', indentLvl: 1, lineBefore: true, lineAfter: true },
+            { pattern: 'FROM', indentLvl: 1, lineBefore: true, lineAfter: true },
+            { pattern: 'WHERE', indentLvl: 1, lineBefore: true, lineAfter: true },
+            { pattern: 'SET', indentLvl: 1, lineBefore: true, lineAfter: true },
+            { pattern: 'UPDATE', indentLvl: 1, lineBefore: true, lineAfter: true },
+            // 其他关键字
+            { pattern: 'VALUES', indentLvl: 1, lineBefore: true, lineAfter: true },
+            { pattern: 'GROUP BY', indentLvl: 1, lineBefore: true, lineAfter: false },
+            { pattern: 'ORDER BY', indentLvl: 1, lineBefore: true, lineAfter: false },
+            { pattern: 'AND', indentLvl: 1, lineBefore: true, lineAfter: false },
+            { pattern: 'OR', indentLvl: 1, lineBefore: true, lineAfter: false },
+            { pattern: 'FETCH FIRST', indentLvl: 1, lineBefore: true, lineAfter: false }
+        ].sort((a, b) => b.pattern.length - a.pattern.length); // 长关键字优先匹配
+        // 4. 处理逻辑
+        let tokens = formatted.split(' ');
+        let i = 0;
+        let currentIndent = 0;
+        let pendingNewline = false;
+        let inParentheses = false; // 标记是否在括号内
+        let parenthesesIndent = 0; // 括号内的基准缩进
 
-        // 处理逗号（改进版）
-        if (currentToken === ',') {
-            result += ',';
+        while (i < tokens.length) {
+            // 尝试匹配多词关键字
+            let matchedRule = null;
+            for (const rule of keywordRules) {
+                const keywordParts = rule.pattern.split(' ');
+                const potentialMatch = tokens.slice(i, i + keywordParts.length).join(' ');
 
-            // 如果在括号内，使用括号内的缩进级别
-            if (inParentheses) {
-                result += '\n' + ' '.repeat(parenthesesIndent);
+                if (potentialMatch === rule.pattern) {
+                    matchedRule = rule;
+                    i += keywordParts.length - 1; // 跳过已匹配的部分
+                    break;
+                }
             }
-            // 如果在VALUES子句中，保持与VALUES相同的缩进
-            else if (result.includes('VALUES')) {
-                const valuesIndent = baseIndent + 2 * indentSize; // VALUES子句的缩进
-                result += '\n' + ' '.repeat(valuesIndent);
-            }
-            // 默认情况：使用当前行的缩进
-            else {
+
+            let currentToken = tokens[i];
+            // 处理左括号
+            if (currentToken === '(') {
+                inParentheses = true;
+                // 记录括号开始的位置缩进
                 const lines = result.split('\n');
                 const currentLine = lines[lines.length - 1] || '';
-                const commaIndent = currentLine.match(/^\s*/)?.[0].length || 0;
-                result += '\n' + ' '.repeat(commaIndent);
+                parenthesesIndent = currentLine.match(/^\s*/)?.[0].length || 0;
+                parenthesesIndent += indentSize; // 括号内容比括号多一级缩进
+            }
+
+            // 处理右括号
+            if (currentToken === ')') {
+                inParentheses = false;
+                parenthesesIndent = 0;
+            }
+
+            // 处理逗号（改进版）
+            if (currentToken === ',') {
+                result += ',';
+
+                // 如果在括号内，使用括号内的缩进级别
+                if (inParentheses) {
+                    result += '\n' + ' '.repeat(parenthesesIndent);
+                }
+                // 如果在VALUES子句中，保持与VALUES相同的缩进
+                else if (result.includes('VALUES')) {
+                    const valuesIndent = baseIndent + 2 * indentSize; // VALUES子句的缩进
+                    result += '\n' + ' '.repeat(valuesIndent);
+                }
+                // 默认情况：使用当前行的缩进
+                else {
+                    const lines = result.split('\n');
+                    const currentLine = lines[lines.length - 1] || '';
+                    const commaIndent = currentLine.match(/^\s*/)?.[0].length || 0;
+                    result += '\n' + ' '.repeat(commaIndent);
+                }
+
+                i++;
+                continue;
+            }
+            if (matchedRule) {
+                currentIndent = baseIndent + matchedRule.indentLvl * indentSize;
+                // 处理关键字前的换行
+                if (matchedRule.lineBefore && result.length > 0) {
+                    result = result.trimEnd();
+                    result += '\n';
+                    pendingNewline = true;
+                }
+
+                // 添加关键字（带缩进）
+                if (pendingNewline) {
+                    result += ' '.repeat(currentIndent);
+                    pendingNewline = false;
+                } else if (result.length > 0) {
+                    result += ' ';
+                }
+                if (matchedRule.pattern === 'EXEC SQL') {
+                    result += ' '.repeat(currentIndent);
+                }
+
+                result += (matchedRule.pattern + ' ');
+
+                // 处理关键字后的换行和缩进
+                if (matchedRule.lineAfter) {
+                    currentIndent = baseIndent + (matchedRule.indentLvl + 1) * indentSize;
+                    result += '\n';
+                    pendingNewline = true;
+                }
+            } else {
+                // 处理非关键字内容
+                if (pendingNewline) {
+                    result += ' '.repeat(currentIndent);
+                    pendingNewline = false;
+                } else if (result.length > 0) {
+                    result += '';
+                }
+                currentToken += ' ';
+                result += currentToken;
             }
 
             i++;
-            continue;
-        }
-        if (matchedRule) {
-            currentIndent = baseIndent + matchedRule.indentLvl * indentSize;
-            // 处理关键字前的换行
-            if (matchedRule.lineBefore && result.length > 0) {
-                result = result.trimEnd();
-                result += '\n';
-                pendingNewline = true;
-            }
-
-            // 添加关键字（带缩进）
-            if (pendingNewline) {
-                result += ' '.repeat(currentIndent);
-                pendingNewline = false;
-            } else if (result.length > 0) {
-                result += ' ';
-            }
-            if (matchedRule.pattern === 'EXEC SQL') {
-                result += ' '.repeat(currentIndent);
-            }
-
-            result += padLineToMultipleOfFour(matchedRule.pattern);
-
-            // 处理关键字后的换行和缩进
-            if (matchedRule.lineAfter) {
-                currentIndent = baseIndent + (matchedRule.indentLvl + 1) * indentSize;
-                result += '\n';
-                pendingNewline = true;
-            }
-        } else {
-            // 处理非关键字内容
-            if (pendingNewline) {
-                result += ' '.repeat(currentIndent);
-                pendingNewline = false;
-            } else if (result.length > 0) {
-                result += '';
-            }
-            currentToken = padLineToMultipleOfFour(currentToken);
-            result += currentToken;
         }
 
-        i++;
+        // 4. 处理逗号换行（保持原有缩进级别）
+        result = result.replace(/,(\s*\S)/g, (match, p1) => `,\n${' '.repeat(currentIndent)}${p1.trim()}`);
+    } catch (error) {
+        vscode.window.showErrorMessage(`formatSQLString: ${error}`);
     }
-
-    // 4. 处理逗号换行（保持原有缩进级别）
-    result = result.replace(/,(\s*\S)/g, (match, p1) => `,\n${' '.repeat(currentIndent)}${p1.trim()}`);
     return result.trimEnd();
 }
 
@@ -395,66 +407,83 @@ function formatCursorStatement(sql: string, baseIndent: number, indentSize: numb
     const indent2 = ' '.repeat(baseIndent + indentSize);      // 第二级缩进 (DECLARE)
     const indent3 = ' '.repeat(baseIndent + indentSize * 2);  // 第三级缩进 (SELECT/FROM)
     const indent4 = ' '.repeat(baseIndent + indentSize * 3);  // 第四级缩进 (列名)
-
-    // 标准化空格处理
-    sql = sql.replace(/\s+/g, ' ').trim();
-
-    // 提取各部分（使用[\s\S]替代.实现跨行匹配）
-    const declarePart = sql.match(/EXEC SQL DECLARE[\s\S]+?CURSOR FOR/)![0];
-    const selectPart = sql.slice(declarePart.length).replace(';', '').trim();
-
-    // 格式化SELECT部分
-    const selectColumns = selectPart.match(/SELECT([\s\S]+?)FROM/)![1].trim();
-    const fromTable = selectPart.match(/FROM([\s\S]+?)(WHERE|ORDER BY|$)/)![1].trim();
-    const whereClause = selectPart.match(/WHERE([\s\S]+?)(ORDER BY|$)/)?.[1]?.trim();
-    const orderByClause = selectPart.match(/ORDER BY([\s\S]+?)(FOR READ ONLY|$)/)?.[1]?.trim();
-    const forReadOnly = selectPart.includes('FOR READ ONLY') ? 'FOR READ ONLY' : '';
-    const withUR = selectPart.includes('WITH UR') ? 'WITH UR' : '';
-
-    // 构建格式化后的SQL
     let result = [];
-    result.push(`${indent1}EXEC SQL`);
-    result.push(`${indent2}${declarePart.replace('EXEC SQL', '').trim()}`);
-
-    // 处理SELECT列
-    result.push(`${indent3}SELECT`);
-    selectColumns.split(',').forEach(col => {
-        result.push(`${indent4}${col.trim()},`);
-    });
-    result[result.length - 1] = result[result.length - 1].slice(0, -1); // 移除最后一个逗号
-
-    // 处理FROM
-    result.push(`${indent3}FROM`);
-    result.push(`${indent4}${fromTable}`);
-
-    // 处理WHERE
-    if (whereClause) {
-        result.push(`${indent3}WHERE`);
-        result.push(formatWhereClauseWithComments(whereClause, baseIndent + indentSize * 3, indentSize));
+    try {
+        // 标准化空格处理
+        sql = sql.replace(/\s+/g, ' ').trim();
+    } catch (error) {
+        vscode.window.showErrorMessage(`formatCursorStatement error: ${error}`);
     }
+    try {
+        // 提取各部分（使用[\s\S]替代.实现跨行匹配）
+        const declarePart = sql.match(/EXEC SQL DECLARE[\s\S]+?CURSOR FOR/)![0];
+        const selectPart = sql.slice(declarePart.length).replace(';', '').trim();
 
-    // 处理ORDER BY
-    if (orderByClause) {
-        // 将ORDER BY及其条件放在同一行
-        let orderByLine = `${indent3}ORDER BY ${orderByClause}`;
-
-        // 处理结尾部分
-        if (forReadOnly || withUR) {
-            orderByLine += ` ${[forReadOnly, withUR].filter(Boolean).join(' ')}`;
+        // 安全提取SELECT部分
+        const selectMatch = selectPart.match(/SELECT([\s\S]+?)FROM/i);
+        if (!selectMatch || !selectMatch[1]) {
+            return indent1 + sql + '\n';
         }
-        orderByLine += ';';
+        const selectColumns = selectMatch[1].trim();
 
-        result.push(orderByLine);
+        // 安全提取FROM部分
+        const fromMatch = selectPart.match(/FROM([\s\S]+?)(WHERE|ORDER BY|$)/i);
+        if (!fromMatch || !fromMatch[1]) {
+            return indent1 + sql + '\n';
+        }
+        const fromTable = fromMatch[1].trim();
+
+        // 安全提取WHERE部分
+        const whereMatch = selectPart.match(/WHERE([\s\S]+?)(ORDER BY|$)/i);
+        if (!whereMatch || !whereMatch[1]) {
+            return indent1 + sql + '\n';
+        }
+        const whereClause = whereMatch && whereMatch[1] ? whereMatch[1].trim() : null;
+
+        // 安全提取ORDER BY部分
+        const orderByMatch = selectPart.match(/ORDER BY([\s\S]+?)(?=FOR READ ONLY|$)/i);
+        const orderByClause = orderByMatch?.[1]?.trim();
+
+        // 安全提取结尾标记
+        const forReadOnly = selectPart.includes('FOR READ ONLY') ? 'FOR READ ONLY' : '';
+        const withUR = selectPart.includes('WITH UR') ? 'WITH UR' : '';
+
+        // 构建格式化后的SQL
+        result.push(`${indent1}EXEC SQL`);
+        result.push(`${indent2}${declarePart.replace('EXEC SQL', '').trim()}`);
+
+        // 处理SELECT列
+        result.push(`${indent3}SELECT`);
+        selectColumns.split(',').forEach(col => {
+            result.push(`${indent4}${col.trim()},`);
+        });
+        result[result.length - 1] = result[result.length - 1].slice(0, -1); // 移除最后一个逗号
+
+        // 处理FROM
+        result.push(`${indent3}FROM`);
+        result.push(`${indent4}${fromTable}`);
+
+        // 处理WHERE
+        if (whereClause) {
+            result.push(`${indent3}WHERE`);
+            result.push(formatWhereClauseWithComments(whereClause, baseIndent + indentSize * 3, indentSize));
+        }
+
+        // 处理ORDER BY
+        if (orderByClause) {
+            // 将ORDER BY及其条件放在同一行
+            let orderByLine = `${indent3}ORDER BY ${orderByClause}`;
+            result.push(orderByLine);
+        }
+
+        // 处理结尾
+        if (forReadOnly || withUR) {
+            let endClause = [forReadOnly, withUR].filter(Boolean).join(' ');
+            result.push(`${indent3}${endClause};`);
+        }
+    } catch (error) {
+        vscode.window.showErrorMessage(`格式化失败: ${(error as Error).message}`);
     }
-
-    // 处理结尾
-    if (forReadOnly || withUR) {
-        let endClause = [forReadOnly, withUR].filter(Boolean).join(' ');
-        result.push(`${indent3}${endClause};`);
-    } else {
-        result[result.length - 1] += ';';
-    }
-
     return result.join('\n');
 }
 function formatWhereClauseWithComments(whereClause: string, baseIndent: number, indentSize: number): string {

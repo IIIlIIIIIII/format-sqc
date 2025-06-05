@@ -5,13 +5,16 @@
   "author": "白色黄昏",
   "publisher": "baisehuanghun",
   "icon": "./icon.png",
-  "repository": "https://github.com/IIIlIIIIIII/format-sqc.git",
-  "version": "0.0.1",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/IIIlIIIIIII/format-sqc.git"
+  },
+  "version": "0.0.3",
   "engines": {
     "vscode": "^1.100.0"
   },
   "categories": [
-    "Other"
+    "Formatters"
   ],
   "activationEvents": [
     "onLanguage:sqc"
