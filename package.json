@@ -9,7 +9,7 @@
         "type": "git",
         "url": "https://github.com/IIIlIIIIIII/format-sqc.git"
     },
-    "version": "0.0.7",
+    "version": "0.0.8",
     "engines": {
         "vscode": "^1.100.0"
     },
@@ -26,6 +26,10 @@
             {
                 "command": "format-sqc.formatsqc",
                 "title": "格式化DB2 SQL"
+            },
+            {
+                "command": "format-sqc.formatDocument",
+                "title": "格式化全文SQC/SQX"
             }
         ],
         "menus": {
@@ -33,13 +37,21 @@
                 {
                     "command": "format-sqc.formatsqc",
                     "group": "format"
+                },
+                {
+                    "command": "format-sqc.formatDocument",
+                    "group": "format"
                 }
             ]
         },
         "keybindings": [
             {
                 "command": "format-sqc.formatsqc",
-                "key": "ctrl+shift+X"
+                "key": "ctrl+shift+S"
+            },
+            {
+                "command": "format-sqc.formatDocument",
+                "key": "ctrl+shift+D"
             }
         ],
         "languages": [

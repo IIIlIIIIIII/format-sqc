@@ -1,9 +1,38 @@
-# Change Log
+# Changelog
 
-All notable changes to the "format-sqc" extension will be documented in this file.
+## [0.0.8] - 2025-06-07
+### Added
+- 支持全文格式化并且跳过单行EXEC SQL处理
+- 快捷键调整
 
-Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
+## [0.0.7] - 2025-06-06
+### Fixed
+- 修复一些bug
 
-## [Unreleased]
+## [0.0.6] - 2025-06-06
+### Fixed
+- 修复一些bug
 
-- Initial release
+## [0.0.5] - 2025-06-06
+### Fixed
+- 逻辑调整,改为选中区域格式化
+
+## [0.0.4] - 2025-06-06
+### Fixed
+- 修复一些bug
+
+## [0.0.4] - 2025-06-06
+### Fixed
+- 修复一些bug
+
+## [0.0.3] - 2025-06-06
+### Fixed
+- 修复一些bug
+
+## [0.0.2] - 2025-06-06
+### Fixed
+- 修复SQL行注释的处理
+
+## [0.0.1] - 2025-06-05
+### Added
+- 全文格式化
