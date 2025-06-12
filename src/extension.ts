@@ -224,9 +224,8 @@ function extractSQLBlocks(text: string): { start: number; end: number; sql: stri
     let match: RegExpExecArray | null;
     while ((match = regex.exec(text)) !== null) {
         const sqlText = match[0];
-        // 判断是否多行（是否包含换行符）
-        if (sqlText.indexOf('\n') === -1) {
-            // 只有一行，视为普通 C 代码，不作为 SQL 块处理
+        // 跳过包含 DECLARE SECTION 或 INCLUDE 的 SQL 块
+        if (/DECLARE\s+SECTION/i.test(sqlText) || sqlText.includes('INCLUDE')) {
             continue;
         }
         blocks.push({
@@ -244,11 +243,17 @@ function formatSQLString(sql: string, baseIndent: number = 0, indentSize: number
     const execIndent = ' '.repeat(baseIndent);
     const sqlIndent = execIndent + indentUnit;
 
+    // 清理冒号后多余空格
+    sql = sql.replace(/:\s+/g, ':');
+
+    // 判断是否多行（是否包含换行符）
+    if (sql.indexOf('\n') === -1) {
+        // 只有一行，视为普通 C 代码，不作为 SQL 块处理
+        return sql;
+    }
+
     // 去掉 EXEC SQL 和末尾分号，trim空白
     let sqlBody = sql.replace(/^\s*EXEC\s+SQL\s+/i, '').replace(/;\s*$/, '').trim();
-
-    // 清理冒号后多余空格
-    sqlBody = sqlBody.replace(/:\s+/g, ':');
 
     // 使用 sql-formatter 格式化
     let formatted = format(sqlBody, {
